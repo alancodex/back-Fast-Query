@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pyodbc
-import re
 import os
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -11,7 +11,12 @@ CORS(app)
 def conectar():
     data = request.json
     try:
-        conn_str = f"DRIVER={{SQL Server}};SERVER={data['servidor']};UID={data['usuario']};PWD={data['senha']}"
+        conn_str = (
+            f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+            f"SERVER={data['servidor']};"
+            f"UID={data['usuario']};"
+            f"PWD={data['senha']}"
+        )
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sys.databases WHERE database_id > 4")  # ignora system dbs
@@ -24,7 +29,13 @@ def conectar():
 def query():
     data = request.json
     try:
-        conn_str = f"DRIVER={{SQL Server}};SERVER={data['servidor']};DATABASE={data['banco']};UID={data['usuario']};PWD={data['senha']}"
+        conn_str = (
+            f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+            f"SERVER={data['servidor']};"
+            f"DATABASE={data['banco']};"
+            f"UID={data['usuario']};"
+            f"PWD={data['senha']}"
+        )
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
         cursor.execute(data['query'])
@@ -47,17 +58,23 @@ def query():
 def preview():
     data = request.json
     try:
-        conn_str = f"DRIVER={{SQL Server}};SERVER={data['servidor']};DATABASE={data['banco']};UID={data['usuario']};PWD={data['senha']}"
+        conn_str = (
+            f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+            f"SERVER={data['servidor']};"
+            f"DATABASE={data['banco']};"
+            f"UID={data['usuario']};"
+            f"PWD={data['senha']}"
+        )
         conn = pyodbc.connect(conn_str, autocommit=False)
         cursor = conn.cursor()
 
-        # Executa a query original (UPDATE/DELETE)
+        # Executa a query original (sem commit)
         cursor.execute(data['query'])
 
-        # Gera SELECT correspondente à query (para visualizar dados que seriam afetados)
+        # Gera SELECT correspondente
         select_query = construir_select_para_preview(data['query'])
         if not select_query:
-            raise Exception("Não é possível gerar SELECT para pré-visualização")
+            raise Exception("Não foi possível gerar SELECT para pré-visualização")
 
         cursor.execute(select_query)
         columns = [desc[0] for desc in cursor.description]
@@ -77,13 +94,10 @@ def preview():
 def construir_select_para_preview(query):
     query_upper = query.strip().upper()
 
-    # Extrai tabela e WHERE
     if query_upper.startswith("UPDATE"):
-        # Ex: UPDATE tabela SET ... WHERE ...
         tabela = re.search(r'UPDATE\s+([^\s]+)', query, re.IGNORECASE)
         where = re.search(r'\bWHERE\b\s+(.+)', query, re.IGNORECASE)
     elif query_upper.startswith("DELETE"):
-        # Ex: DELETE FROM tabela WHERE ...
         tabela = re.search(r'DELETE\s+FROM\s+([^\s]+)', query, re.IGNORECASE)
         where = re.search(r'\bWHERE\b\s+(.+)', query, re.IGNORECASE)
     else:
@@ -95,7 +109,6 @@ def construir_select_para_preview(query):
     tabela_nome = tabela.group(1)
     where_clause = where.group(1) if where else ""
 
-    # Monta a SELECT para visualizar
     if where_clause:
         return f"SELECT TOP 100 * FROM {tabela_nome} WHERE {where_clause}"
     else:
@@ -104,4 +117,3 @@ def construir_select_para_preview(query):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-
