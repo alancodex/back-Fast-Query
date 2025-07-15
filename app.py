@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pyodbc
 import re
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -56,7 +57,7 @@ def preview():
         # Gera SELECT correspondente à query (para visualizar dados que seriam afetados)
         select_query = construir_select_para_preview(data['query'])
         if not select_query:
-            raise Exception("Não foi possível gerar SELECT para pré-visualização")
+            raise Exception("Não é possível gerar SELECT para pré-visualização")
 
         cursor.execute(select_query)
         columns = [desc[0] for desc in cursor.description]
@@ -101,4 +102,6 @@ def construir_select_para_preview(query):
         return f"SELECT TOP 100 * FROM {tabela_nome}"
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
+
